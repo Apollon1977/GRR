@@ -2,9 +2,9 @@
 /**
  * include/functions.inc.php
  * fichier Bibliothèque de fonctions de GRR
- * Dernière modification : $Date: 2021-10-31 11:38$
+ * Dernière modification : $Date: 2022-01-14 11:33$
  * @author    JeromeB & Laurent Delineau & Marc-Henri PAMISEUX & Yan Naessens
- * @copyright Copyright 2003-2021 Team DEVOME - JeromeB
+ * @copyright Copyright 2003-2022 Team DEVOME - JeromeB
  * @link      http://www.gnu.org/licenses/licenses.html
  *
  * This file is part of GRR.
@@ -513,23 +513,17 @@ function resaToModerate($user)
     }
     return $resas;
 }
-/*
-Teste s'il reste ou non des plages libres sur une journée donnée pour un domaine donné.
-Arguments :
-$id_room : identifiant de la ressource
-$month_week : mois
-$day_week : jour
-$year_week : année
-Renvoie vrai s'il reste des plages non réservées sur la journée
-Renvoie faux dans le cas contraire
+/** fonction plages_libre_semaine_ressource($id_room, $month_week, $day_week, $year_week)
+ * Teste s'il reste ou non des plages libres sur une journée donnée pour un domaine donné.
+ * Arguments :
+ *  integer $id_room : identifiant de la ressource
+ *  integer $month_week : mois
+ *  integer $day_week : jour
+ *  integer $year_week : année
+ * Renvoie un booléen :
+ *  vrai s'il reste des plages non réservées sur la journée
+ *  faux dans le cas contraire
 */
-/**
- * @param integer $id_room
- * @param integer $month_week
- * @param integer $day_week
- * @param integer $year_week
- * @return boolean
- */
 function plages_libre_semaine_ressource($id_room, $month_week, $day_week, $year_week)
 {
 	global $morningstarts, $eveningends, $eveningends_minutes, $resolution, $enable_periods;
@@ -542,14 +536,15 @@ function plages_libre_semaine_ressource($id_room, $month_week, $day_week, $year_
 	while ($t < $date_end)
 	{
 		$t_end = $t + $resolution;
-		$query = "SELECT id FROM ".TABLE_PREFIX."_entry WHERE room_id='".$id_room."' AND start_time <= ".$t." AND end_time >= ".$t_end." ";
-		$test = grr_sql_query1($query);
-		if ($test == -1)
-		{
+		$query = "SELECT end_time FROM ".TABLE_PREFIX."_entry WHERE room_id='".$id_room."' AND start_time <= ".$t." AND end_time >= ".$t_end." ";
+		$end_time = grr_sql_query1($query);
+		if ($end_time == -1){
 			$plage_libre = true;
 			break;
+		} 
+        else{
+			$t = $end_time; // avance à la fin de la réservation trouvée
 		}
-		$t += $resolution;
 	}
 	return $plage_libre ;
 }
@@ -5097,8 +5092,10 @@ $(\'.clockpicker\').clockpicker({
 function jQuery_TimePicker2($typeTime, $start_hour, $start_min,$dureepardefaultsec,$resolution,$morningstarts,$eveningends,$eveningends_minutes,$twentyfourhour_format=0)
 {
     $minTime = $morningstarts.":00";
-    $eveningends_minutes = str_pad($eveningends_minutes, 2, 0, STR_PAD_LEFT);
-    $maxTime = $eveningends.":".$eveningends_minutes;
+    //$eveningends_minutes = str_pad($eveningends_minutes, 2, 0, STR_PAD_LEFT);
+    //$maxTime = $eveningends.":".$eveningends_minutes;
+    $end_time = mktime($eveningends,$eveningends_minutes,0,0,0,0);
+    $maxTime = date("H:i",$end_time);
 	if (isset ($_GET['id']))
 	{
 		if (isset($start_hour) && isset($start_min))
@@ -5116,13 +5113,16 @@ function jQuery_TimePicker2($typeTime, $start_hour, $start_min,$dureepardefaults
 	{
 		$hour = (isset ($_GET['hour']))? clean_input($_GET['hour']) : date("H");
 		$minute = (isset ($_GET['minute']))? clean_input($_GET['minute']) : date("i");
-
+        $minute = str_pad($minute, 2, 0, STR_PAD_LEFT);
+        if (($hour.":".$minute) < $minTime){
+            $hour = $morningstarts;
+            $minute = "00";
+        }
 		if ($typeTime == 'end_')
         {
             $dureepardefautmin = $dureepardefaultsec/60;
             if ($dureepardefautmin == 60){
-                $ajout = 1;
-                $hour += $ajout;
+                $hour++;
                 $minute ="00";
             }
             if ($dureepardefautmin < 60){
@@ -5139,8 +5139,13 @@ function jQuery_TimePicker2($typeTime, $start_hour, $start_min,$dureepardefaults
                 $hour = str_pad($hour, 2, 0, STR_PAD_LEFT);
                 $minute += $dureepardefautmin % 60;
             }
+            $minute = str_pad($minute, 2, 0, STR_PAD_LEFT);
+            if (($hour.":".$minute) > $maxTime){
+                $maxTime_split = explode(":",$maxTime);
+                $hour = str_pad($maxTime_split[0], 2, 0, STR_PAD_LEFT);
+                $minute = str_pad($maxTime_split[1], 2, 0, STR_PAD_LEFT);
+            }
         }
-        $minute = str_pad($minute, 2, 0, STR_PAD_LEFT);
 	}
     $timeFormat = ($twentyfourhour_format)? "H:i" : "h:i a";
 	echo '<label for="'.$typeTime.'">'.get_vocab('time').get_vocab('deux_points').'</label>
